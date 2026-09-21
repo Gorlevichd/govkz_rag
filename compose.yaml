@@ -1,0 +1,99 @@
+x-app-image: &app-image
+  image: govkz-rag:local
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  assets-init:
+    <<: *app-image
+    command: ["python", "docker/prepare_assets.py"]
+    restart: "no"
+    environment:
+      DATASET_URL: ${DATASET_URL:-https://magda-minio-web.data.gov.kz/magda-datasets/egov_ru.xlsx}
+      HF_HOME: /app/.cache/huggingface
+    volumes:
+      - dataset:/app/data
+      - reranker-models:/app/models
+      - huggingface-cache:/app/.cache/huggingface
+
+  ollama-init:
+    <<: *app-image
+    command: ["python", "docker/prepare_ollama.py"]
+    restart: "no"
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  index-init:
+    <<: *app-image
+    command: ["python", "docker/prepare_index.py"]
+    restart: "no"
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+    volumes:
+      - dataset:/app/data:ro
+      - chroma-index:/app/data/chroma
+    depends_on:
+      assets-init:
+        condition: service_completed_successfully
+      ollama-init:
+        condition: service_completed_successfully
+
+  app:
+    <<: *app-image
+    restart: unless-stopped
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      BASE_URL: ${BASE_URL:-}
+      API_KEY: ${API_KEY:-}
+      CA_BUNDLE: ${CA_BUNDLE:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
+    volumes:
+      - dataset:/app/data:ro
+      - chroma-index:/app/data/chroma
+      - reranker-models:/app/models:ro
+    ports:
+      - "8501:8501"
+    depends_on:
+      assets-init:
+        condition: service_completed_successfully
+      index-init:
+        condition: service_completed_successfully
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  dataset:
+  reranker-models:
+  huggingface-cache:
+  ollama-models:
+  chroma-index:

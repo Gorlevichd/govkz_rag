@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 import logging
+import os
 from time import perf_counter
 from typing import Any, Protocol
 
@@ -9,7 +10,7 @@ import httpx
 
 
 LOGGER = logging.getLogger("uvicorn.error")
-OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 
 
 class EmbeddingModel(Protocol):

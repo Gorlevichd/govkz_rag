@@ -62,6 +62,34 @@ latency. Reproduce the evaluation with:
 python eval.py
 ```
 
+## Docker installation
+
+Docker Compose provides the simplest complete installation. It downloads and
+validates the public eGov workbook, downloads the pinned Hugging Face reranker,
+pulls the required Ollama models, builds the Chroma index, and then starts the
+application:
+
+```powershell
+docker compose up --build
+```
+
+Open `http://localhost:8501`. The first start can take several minutes because it
+downloads model weights and creates the index. Docker volumes preserve the dataset,
+reranker, Ollama models, and index for later starts.
+
+The initializers use these public sources:
+
+- [Kazakhstan eGov workbook](https://ashyq.data.gov.kz/dataset/magda-ds-44acd1a0-59d4-45d6-85cc-8c00cde6a748/details?q=)
+- [Multilingual cross-encoder reranker](https://huggingface.co/cross-encoder/mmarco-mMiniLMv2-L12-H384-v1)
+
+Local QA is the default and requires no credentials. To use an external
+OpenAI-compatible service, change `agent.qa.provider` and `agent.qa.model` in
+`config.yaml`, then set `BASE_URL` and `API_KEY` in `.env` before rebuilding.
+
+The default Compose configuration is CPU-compatible. Local QA may be slow on weak
+machines; GPU-enabled Ollama can be configured with a Compose override appropriate
+for the host platform.
+
 ## Local setup
 
 Requirements:
