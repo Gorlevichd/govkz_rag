@@ -4,6 +4,13 @@ import pytest
 import serve
 
 
+def test_backend_api_url_uses_connectable_loopback_address() -> None:
+    assert (
+        serve.backend_api_url("0.0.0.0", 9000)
+        == "http://127.0.0.1:9000/ask/invoke"
+    )
+
+
 class FakeProcess:
     def poll(self) -> None:
         return None

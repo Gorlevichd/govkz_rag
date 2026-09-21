@@ -1,207 +1,163 @@
 # Kazakhstan eGov RAG
 
-A LangServe backend and Streamlit frontend for questions about Kazakhstan e-government services. It
-loads the Russian QA dataset from `data/egov_ru.xlsx`, retrieves supporting
-records locally, and uses Groq-hosted Qwen to answer only from that evidence.
+Government-service information is often spread across long pages and difficult to
+find with natural-language queries. This proof of concept answers Russian-language
+questions about Kazakhstan eGov services and shows the original sources used for
+each answer.
 
-## Architecture
+The application is deliberately grounded: it retrieves relevant records first,
+reranks them locally, and instructs the QA model to answer only from that evidence.
+If the evidence is insufficient, it returns a refusal instead of inventing an
+answer.
 
-The HTTP, application, retrieval, and agent layers are independent:
+## What it does
 
-1. `api/app.py` mounts the LangGraph runnable at the API root with LangServe.
-2. `api/runnable.py` constructs and types the question-answering runnable.
-3. `retrieval/loader.py` uses pandas and Pydantic to validate Excel records, then
-   consolidates duplicate services while retaining distinct `for_embedding` values
-   as query aliases.
-4. `retrieval/chroma.py` stores query aliases and canonical documents in separate
-   local Chroma collections. It runs cosine and BM25 search over aliases, combines
-   them with reciprocal-rank fusion (RRF), and collapses results by canonical service.
-5. `retrieval/reranker.py` uses the local multilingual cross-encoder under
-   `models/` to reorder canonical candidates and remove candidates below its
-   relevance threshold.
-6. `agent/graph.py` runs a LangGraph flow: prepare the retrieval query, retrieve,
-   check evidence, answer or refuse, and finalize citations. LLM query
-   summarization is optional and disabled by default to avoid a second chat-model
-   inference on every request.
-7. `agent/citations.py` validates model citations and deterministically appends
-   cited document names and deduplicated `egov_link` values. Other URL fields
-   are intentionally not exposed.
-8. `serve.py` renders the structured answer, expandable sources, and an
-   expandable useful-links block.
+- Loads and validates an eGov question-answer workbook.
+- Combines semantic and BM25 search with reciprocal-rank fusion.
+- Reranks candidates with a local multilingual cross-encoder.
+- Uses LangGraph to produce a concise, source-grounded answer.
+- Serves a Streamlit interface and a LangServe API.
 
-Embeddings, indexing, retrieval, and reranking stay local. For each answer, the
-user question and the selected evidence records are sent to Groq. The complete
-workbook and Chroma index are never uploaded.
+```mermaid
+flowchart LR
+    Q[User question] --> R[Hybrid retrieval]
+    R --> C[Local cross-encoder]
+    C --> A[LangGraph QA]
+    A --> O[Answer and original sources]
+```
 
-## Setup
+Embeddings, the search index, and reranking stay local. By default, answer
+generation also runs locally through Ollama. An external OpenAI-compatible API
+can be enabled when needed.
 
-Python 3.12+, Ollama, and a Groq API key are required.
+## RAG evaluation
+
+The repository includes a 30-question Russian retrieval set in
+`evals/rag_eval_30.jsonl`. It stores questions and relevant document IDs only—not
+the source texts or expected answers.
+
+Results for the checked-in configuration, retrieving three documents per query:
+
+| Metric | Result |
+| --- | ---: |
+| Hit@1 | 70.0% |
+| Recall@3 | 86.7% |
+| Precision@3 | 28.9% |
+| MRR@3 | 0.783 |
+| nDCG@3 | 0.805 |
+| Mean retrieval latency | 1.72 s |
+| P95 retrieval latency | 2.33 s |
+
+These metrics evaluate retrieval, not generated-answer quality. Hardware affects
+latency. Reproduce the evaluation with:
+
+```powershell
+python eval.py
+```
+
+## Local setup
+
+Requirements:
+
+- Python 3.12+
+- [Ollama](https://ollama.com/) for local embeddings and default QA generation
+- [RAG Dataset](https://ashyq.data.gov.kz/dataset/magda-ds-44acd1a0-59d4-45d6-85cc-8c00cde6a748/details?q=) from AshyqData Portal
+- API credentials only when using the optional external QA configuration
+- The excluded dataset and reranker files described below
+
+On Windows PowerShell:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ollama pull qwen3-embedding:0.6b
+ollama pull qwen3:4b
+Copy-Item .env.example .env
 ```
 
-Put the Groq API key in the untracked `.env` file as `GROQ_KEY`. The application
-loads it into the process environment at startup. Never add the key to
-`config.yaml`, source code, tests, or version control.
+Provide the following excluded files:
 
-Groq HTTPS connections use the operating system certificate store. If a
-corporate proxy uses a private CA that is not installed system-wide, export its
-public certificate chain as a PEM bundle and set `GROQ_CA_BUNDLE` in `.env` to
-that file's absolute path. TLS certificate verification is never disabled.
+```text
+data/egov_ru.xlsx
+models/mmarco-mMiniLMv2-L12-h384-v1/
+```
 
-Place the QA workbook at `data/egov_ru.xlsx` and the unpacked reranker at
-`models/mmarco-mMiniLMv2-L12-h384-v1`. Both directories are ignored by Git
-except for their `.gitkeep` placeholders. The reranker is loaded in offline-only
-mode and is never downloaded by the application. To run without it, set
-`reranker.enabled: false` before starting the server.
+### QA model
 
-All runtime settings live in `config.yaml`.
+**Local Ollama is the default QA provider.** The checked-in configuration is:
 
-## Build the semantic index
+```yaml
+qa:
+  provider: ollama
+  model: qwen3:4b
+  request_timeout_seconds: 240
+  reasoning_effort: none
+  keep_alive: 5m
+```
+
+It requires no API key and keeps retrieved evidence and generated answers on the
+local machine.
+
+**On machines with limited RAM, VRAM, or CPU capacity, a local QA model can be the
+main performance bottleneck.** Use a smaller Ollama model or an external service
+when response latency is too high.
+
+To use any service that implements the OpenAI-compatible Chat Completions API,
+replace the `qa` section with:
+
+```yaml
+qa:
+  provider: openai
+  model: provider-model-name
+  request_timeout_seconds: 120
+  reasoning_effort: none
+```
+
+Then put the external API token in `.env`:
+
+```dotenv
+BASE_URL=https://your-provider.example/v1
+API_KEY=replace-me
+```
+
+If HTTPS traffic passes through a corporate proxy, optionally set `CA_BUNDLE` to
+the absolute path of its PEM certificate bundle.
+
+Build the local Chroma index:
 
 ```powershell
 python create_index.py
 ```
 
-This recreates the `egov_services` query-alias collection and its companion
-`egov_services_documents` canonical-document collection under `data/chroma`.
-The directory is ignored by Git. Indexing prints alias-embedding progress after
-every Ollama batch. Search and question answering require both collections. An
-interrupted or inconsistent build will not be used for answers.
-
-## Run the app
+Start the application:
 
 ```powershell
 streamlit run serve.py
 ```
 
-Streamlit automatically starts the local LangServe backend and warms up the
-configured Ollama embedding model. If a backend is already running at the
-configured address, the frontend reuses it.
-
-For backend debugging, it can still be started separately:
-
-```powershell
-python backend.py
-```
-
-Ask a question with LangServe's `POST /invoke` endpoint:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/invoke `
-  -ContentType "application/json" `
-  -Body '{"input":{"question":"Как заменить удостоверение личности после смены фамилии?"}}'
-```
-
-The `output` field contains only the agent's final answer. A grounded response
-contains inline citations, a source list built from the cited records, and an
-optional deduplicated list of useful links:
-
-```text
-Подать заявление можно через портал. [1]
-
-Источники:
-
-[1] - Процедура регистрации брака
-
-Полезные ссылки:
-
-- https://egov.kz/...
-```
-
-Retrieval hits, grounding state, and LangGraph intermediate state remain
-internal.
-
-LangServe also exposes `/batch`, `/stream`, `/stream_log`, input/output schema,
-and playground endpoints. Interactive OpenAPI documentation is available at
-`http://127.0.0.1:8000/docs`.
-
-The frontend uses `POST /ask/invoke`, which returns the answer body, cited
-source metadata, deduplicated `egov_link` values, and grounding status as
-separate fields. The original `POST /invoke` text response remains available.
-
-The backend address and frontend request timeout are configured under
-`frontend` in `config.yaml`.
-
-At backend startup, the configured Ollama embedding model is warmed up and
-retained for five minutes. Set `server.warmup_embedding: false` to disable this
-behavior. Chat generation is handled by Groq and requires no local warm-up.
-
-## Configuration
-
-Edit `config.yaml` to change workbook and Chroma paths, the local Ollama
-embedding model, Groq chat model, indexing
-batch size, retrieval/RRF settings, alias candidate expansion, the minimum
-semantic-similarity threshold, reranker model and limits, summarization and
-generation limits, reasoning mode, or server host and port. Hidden model
-reasoning is disabled by default to keep responses fast and focused. The local
-embedding model uses a five-minute keep-alive. Set `summarization.enabled: true` only when
-evaluation shows that direct user questions do not retrieve reliably enough.
-
-The backend logs durations for local Ollama embedding, Groq chat requests, query
-preparation, retrieval, answer generation, and embedding warm-up. These entries
-use the prefix `latency stage=`.
-
-`retrieval.min_semantic_similarity` is applied to every candidate before the
-final `top_k` results are selected and again before context generation. The
-default is `0.60`; lower it only after evaluating rejected valid questions.
-
-RRF supplies up to `reranker.candidate_k` canonical documents after the semantic
-gate. The reranker scores those documents against the original user question,
-orders them by direct relevance, applies `reranker.min_score`, and returns the
-configured retrieval `top_k`. The default `min_score` is `0.0`, so reranking
-initially changes ordering without rejecting additional documents. Calibrate it
-on reviewed questions before raising it. If local reranking fails, the retriever
-returns no unchecked evidence and the agent uses its safe insufficiency response.
-Reranking is query-time only, so enabling or changing it does not require an
-index rebuild.
-
-## Langfuse monitoring
-
-Langfuse tracing is optional and disabled by default. To enable it, copy the
-variables from `.env.example` into your environment, provide credentials for
-your Langfuse Cloud or self-hosted project, and set `langfuse.enabled: true` in
-`config.yaml`.
-
-```powershell
-$env:LANGFUSE_PUBLIC_KEY = "pk-lf-..."
-$env:LANGFUSE_SECRET_KEY = "sk-lf-..."
-$env:LANGFUSE_BASE_URL = "https://cloud.langfuse.com"
-python backend.py
-```
-
-Each `/invoke` run is recorded under the configured `langfuse.run_name`, with
-the LangGraph node hierarchy, timings, inputs, outputs, and errors. When using
-Langfuse Cloud, question and answer trace data leave the local machine; use a
-self-hosted endpoint or leave monitoring disabled if that is not acceptable.
-
-Rebuild the index whenever the workbook, canonicalization logic, or embedding
-model changes. Both collections store the source fingerprint and embedding
-model name. Indexes created before the query-alias layout are intentionally
-rejected and must be rebuilt with `python create_index.py`.
+`serve.py` starts the LangServe backend automatically. The API documentation is
+available at `http://127.0.0.1:8000/docs`. Runtime settings, including model names,
+retrieval thresholds, and server addresses, are in `config.yaml`.
 
 ## Tests
 
 ```powershell
-python -m pytest
+python -m pytest -q
 ```
 
-Tests use an ephemeral Chroma client and fake embeddings. They do not call
-Ollama or any network service.
+The automated tests use fake model responses and a temporary Chroma instance.
+They do not require Ollama, an external API, credentials, the source workbook, or
+downloaded model files. GitHub Actions runs them on every push and pull request.
 
-## Evaluation set
+## Repository boundaries
 
-`evals/rag_eval_30.jsonl` contains 30 answerable Russian questions mapped to
-canonical document IDs, source record IDs, indexed reference answers, service
-names, and expected eGov URLs. The questions are manually paraphrased and are
-validated not to exactly duplicate any stored query alias.
+The following are intentionally excluded from version control:
 
-Regenerate the reference fields from the current canonical Chroma index with:
+- `data/egov_ru.xlsx` and other source datasets
+- generated Chroma indexes under `data/chroma/`
+- downloaded reranker files under `models/`
+- `.env`, API keys, certificates, and other credentials
 
-```powershell
-python evals/build_eval_set.py
-```
+The empty `data/` and `models/` directories are retained with `.gitkeep` files.
+`.env.example` documents variable names without containing secrets.

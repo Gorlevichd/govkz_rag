@@ -6,18 +6,16 @@ chroma:
   collection: egov_services
 
 ollama:
-  base_url: http://127.0.0.1:11434
   embedding_model: qwen3-embedding:0.6b
   request_timeout_seconds: 180
   embedding_keep_alive: 5m
 
-groq:
-  base_url: https://api.groq.com/openai/v1
-  chat_model: qwen/qwen3.8-27b
-  api_key_env: GROQ_KEY
-  ca_bundle_env: GROQ_CA_BUNDLE
-  request_timeout_seconds: 120
+qa:
+  provider: ollama
+  model: qwen3:4b
+  request_timeout_seconds: 240
   reasoning_effort: none
+  keep_alive: 5m
 
 index:
   batch_size: 64
@@ -61,7 +59,6 @@ server:
   warmup_embedding: true
 
 frontend:
-  api_url: http://127.0.0.1:8000/ask/invoke
   request_timeout_seconds: 240
 
 langfuse:

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated, Literal
 
 import yaml
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, PositiveInt
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 
 
 class DataSettings(BaseModel):
@@ -22,21 +23,34 @@ class ChromaSettings(BaseModel):
 class OllamaSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    base_url: AnyHttpUrl
     embedding_model: str = Field(min_length=1)
     request_timeout_seconds: float = Field(gt=0)
     embedding_keep_alive: str | int
 
 
-class GroqSettings(BaseModel):
+class OllamaQaSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    base_url: AnyHttpUrl
-    chat_model: str = Field(min_length=1)
-    api_key_env: str = Field(min_length=1)
-    ca_bundle_env: str = Field(min_length=1)
+    provider: Literal["ollama"]
+    model: str = Field(min_length=1)
     request_timeout_seconds: float = Field(gt=0)
     reasoning_effort: str = Field(min_length=1)
+    keep_alive: str | int = "5m"
+
+
+class OpenAIQaSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["openai"]
+    model: str = Field(min_length=1)
+    request_timeout_seconds: float = Field(gt=0)
+    reasoning_effort: str = Field(min_length=1)
+
+
+QaSettings = Annotated[
+    OllamaQaSettings | OpenAIQaSettings,
+    Field(discriminator="provider"),
+]
 
 
 class IndexSettings(BaseModel):
@@ -104,7 +118,6 @@ class ServerSettings(BaseModel):
 class FrontendSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    api_url: AnyHttpUrl
     request_timeout_seconds: float = Field(gt=0)
 
 
@@ -121,7 +134,7 @@ class Settings(BaseModel):
     data: DataSettings
     chroma: ChromaSettings
     ollama: OllamaSettings
-    groq: GroqSettings
+    qa: QaSettings
     index: IndexSettings
     retrieval: RetrievalSettings
     reranker: RerankerSettings

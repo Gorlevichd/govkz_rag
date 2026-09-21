@@ -110,16 +110,13 @@ async def test_stream_log_endpoint_is_registered(client: AsyncClient) -> None:
 async def test_public_runnable_returns_only_final_answer(monkeypatch) -> None:
     settings = SimpleNamespace(
         ollama=SimpleNamespace(
-            base_url="http://localhost:11434",
             embedding_model="embedding",
             request_timeout_seconds=30,
             embedding_keep_alive=0,
         ),
-        groq=SimpleNamespace(
-            base_url="https://api.groq.com/openai/v1",
-            chat_model="qwen/qwen3.8-27b",
-            api_key_env="GROQ_KEY",
-            ca_bundle_env="GROQ_CA_BUNDLE",
+        qa=SimpleNamespace(
+            provider="openai",
+            model="provider-model",
             request_timeout_seconds=30,
             reasoning_effort="none",
         ),
@@ -171,12 +168,48 @@ async def test_public_runnable_returns_only_final_answer(monkeypatch) -> None:
             }
         ),
     )
-    monkeypatch.setenv("GROQ_KEY", "test-key")
+    monkeypatch.setenv("BASE_URL", "https://api.example.test/v1")
+    monkeypatch.setenv("API_KEY", "test-key")
 
     runnable = runnable_module.build_question_runnable(settings)
     result = await runnable.ainvoke({"question": "Вопрос"})
 
     assert result == "Финальный ответ"
+
+
+def test_local_qa_client_does_not_require_api_key(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        qa=SimpleNamespace(
+            provider="ollama",
+            model="qwen3:8b",
+            request_timeout_seconds=30,
+            reasoning_effort="none",
+            keep_alive="5m",
+        ),
+        generation=SimpleNamespace(temperature=0.1, max_tokens=128),
+    )
+    monkeypatch.delenv("API_KEY", raising=False)
+
+    client = runnable_module.build_chat_client(settings)
+
+    assert isinstance(client, runnable_module.OllamaChatClient)
+
+
+def test_external_qa_client_requires_fixed_api_key(monkeypatch) -> None:
+    settings = SimpleNamespace(
+        qa=SimpleNamespace(
+            provider="openai",
+            model="model",
+            request_timeout_seconds=30,
+            reasoning_effort="none",
+        ),
+        generation=SimpleNamespace(temperature=0.1, max_tokens=128),
+    )
+    monkeypatch.setenv("BASE_URL", "https://api.example.test/v1")
+    monkeypatch.delenv("API_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="API_KEY"):
+        runnable_module.build_chat_client(settings)
 
 
 @pytest.mark.asyncio

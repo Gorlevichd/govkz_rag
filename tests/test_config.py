@@ -13,15 +13,12 @@ chroma:
   path: state/chroma
   collection: test_services
 ollama:
-  base_url: http://localhost:11434/
   embedding_model: embedding-model
   request_timeout_seconds: 90
   embedding_keep_alive: 0
-groq:
-  base_url: https://api.groq.com/openai/v1
-  chat_model: qwen/qwen3.8-27b
-  api_key_env: GROQ_KEY
-  ca_bundle_env: GROQ_CA_BUNDLE
+qa:
+  provider: openai
+  model: provider-model
   request_timeout_seconds: 60
   reasoning_effort: none
 index:
@@ -59,7 +56,6 @@ server:
   port: 9000
   warmup_embedding: true
 frontend:
-  api_url: http://127.0.0.1:9000/ask/invoke
   request_timeout_seconds: 120
 langfuse:
   enabled: false
@@ -81,13 +77,11 @@ langfuse:
     assert settings.reranker.candidate_k == 8
     assert settings.reranker.min_score == 0.25
     assert settings.evaluation.dataset == tmp_path / "evals/test_eval.jsonl"
-    assert str(settings.ollama.base_url) == "http://localhost:11434/"
     assert settings.ollama.request_timeout_seconds == 90
     assert settings.ollama.embedding_keep_alive == 0
-    assert settings.groq.chat_model == "qwen/qwen3.8-27b"
-    assert settings.groq.api_key_env == "GROQ_KEY"
-    assert settings.groq.ca_bundle_env == "GROQ_CA_BUNDLE"
-    assert settings.groq.reasoning_effort == "none"
+    assert settings.qa.provider == "openai"
+    assert settings.qa.model == "provider-model"
+    assert settings.qa.reasoning_effort == "none"
     assert settings.index.embedding_keep_alive == "5m"
     assert settings.summarization.max_tokens == 48
     assert settings.summarization.enabled is False
@@ -96,7 +90,6 @@ langfuse:
     assert settings.generation.think is False
     assert settings.server.port == 9000
     assert settings.server.warmup_embedding is True
-    assert str(settings.frontend.api_url) == "http://127.0.0.1:9000/ask/invoke"
     assert settings.frontend.request_timeout_seconds == 120
     assert settings.langfuse.enabled is False
     assert settings.langfuse.run_name == "test-egov-question"

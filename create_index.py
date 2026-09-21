@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from govkz_rag.config import Settings  # noqa: E402
-from govkz_rag.ollama import OllamaEmbeddingClient  # noqa: E402
+from govkz_rag.ollama import OLLAMA_BASE_URL, OllamaEmbeddingClient  # noqa: E402
 from govkz_rag.retrieval import (  # noqa: E402
     collection_exists,
     load_documents,
@@ -19,7 +19,7 @@ from govkz_rag.retrieval import (  # noqa: E402
 
 def _client(settings: Settings) -> OllamaEmbeddingClient:
     return OllamaEmbeddingClient(
-        str(settings.ollama.base_url).rstrip("/"),
+        OLLAMA_BASE_URL,
         settings.ollama.embedding_model,
         timeout_seconds=settings.ollama.request_timeout_seconds,
         embedding_keep_alive=settings.index.embedding_keep_alive,

@@ -35,6 +35,11 @@ def without_reference_numbers(answer: str) -> str:
     return REFERENCE_NUMBER_PATTERN.sub("", answer).strip()
 
 
+def backend_api_url(host: str, port: int) -> str:
+    client_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+    return f"http://{client_host}:{port}/ask/invoke"
+
+
 def _backend_health_url(api_url: str) -> str:
     url = httpx.URL(api_url)
     return str(url.copy_with(path="/openapi.json", query=None, fragment=None))
@@ -130,6 +135,7 @@ def request_answer(
 
 def main() -> None:
     settings = Settings.from_yaml(PROJECT_ROOT / "config.yaml")
+    api_url = backend_api_url(settings.server.host, settings.server.port)
     st.set_page_config(
         page_title="Государственные услуги Казахстана",
         page_icon="🇰🇿",
@@ -169,7 +175,7 @@ def main() -> None:
     try:
         with st.spinner("Запускаем сервис и локальные модели…"):
             ensure_backend(
-                str(settings.frontend.api_url),
+                api_url,
                 settings.frontend.request_timeout_seconds,
             )
     except BackendStartupError as exc:
@@ -194,7 +200,7 @@ def main() -> None:
         with st.spinner("Ищем информацию в базе государственных услуг…"):
             result = request_answer(
                 question.strip(),
-                str(settings.frontend.api_url),
+                api_url,
                 settings.frontend.request_timeout_seconds,
             )
     except FrontendRequestError as exc:

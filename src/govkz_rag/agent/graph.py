@@ -29,7 +29,7 @@ from govkz_rag.agent.state import (
     GroundedAnswer,
     RetrievalQuery,
 )
-from govkz_rag.groq import ChatModel
+from govkz_rag.chat import ChatModel
 from govkz_rag.retrieval import Retriever
 
 
@@ -52,6 +52,7 @@ def build_agent(
     summary_max_tokens: int = 64,
     summary_temperature: float = 0.0,
     summary_think: bool = False,
+    generation_think: bool = False,
     summarize_query: bool = True,
 ) -> Any:
     async def summarize_node(state: AgentState) -> AgentState:
@@ -151,6 +152,7 @@ def build_agent(
         )
         response = await chat_model.chat(
             messages,
+            think=generation_think,
             response_format=schema,
         )
         try:

@@ -11,10 +11,10 @@ from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
 import truststore
 
 from govkz_rag.agent import build_agent
+from govkz_rag.chat import ChatModel, OllamaChatClient, OpenAIChatClient
 from govkz_rag.config import Settings
-from govkz_rag.groq import GroqChatClient
 from govkz_rag.observability import create_langfuse_handler
-from govkz_rag.ollama import OllamaEmbeddingClient
+from govkz_rag.ollama import OLLAMA_BASE_URL, OllamaEmbeddingClient
 from govkz_rag.retrieval import ChromaRetriever, CrossEncoderReranker
 from govkz_rag.api.schemas import AnswerResponse, QuestionRequest
 
@@ -24,40 +24,50 @@ LOGGER = logging.getLogger("uvicorn.error")
 
 def build_embedding_client(settings: Settings) -> OllamaEmbeddingClient:
     return OllamaEmbeddingClient(
-        str(settings.ollama.base_url).rstrip("/"),
+        OLLAMA_BASE_URL,
         settings.ollama.embedding_model,
         timeout_seconds=settings.ollama.request_timeout_seconds,
         embedding_keep_alive=settings.ollama.embedding_keep_alive,
     )
 
 
-def build_chat_client(settings: Settings) -> GroqChatClient:
-    api_key = os.getenv(settings.groq.api_key_env)
-    if not api_key:
-        raise ValueError(
-            f"Required environment variable {settings.groq.api_key_env} is not set"
+def build_chat_client(settings: Settings) -> ChatModel:
+    if settings.qa.provider == "ollama":
+        return OllamaChatClient(
+            OLLAMA_BASE_URL,
+            settings.qa.model,
+            timeout_seconds=settings.qa.request_timeout_seconds,
+            temperature=settings.generation.temperature,
+            max_tokens=settings.generation.max_tokens,
+            reasoning_effort=settings.qa.reasoning_effort,
+            keep_alive=settings.qa.keep_alive,
         )
-    ca_bundle = os.getenv(settings.groq.ca_bundle_env)
-    ssl_context = _groq_ssl_context(ca_bundle)
-    return GroqChatClient(
-        str(settings.groq.base_url).rstrip("/"),
-        settings.groq.chat_model,
+
+    base_url = os.getenv("BASE_URL")
+    if not base_url:
+        raise ValueError("Required environment variable BASE_URL is not set")
+    api_key = os.getenv("API_KEY")
+    if not api_key:
+        raise ValueError("Required environment variable API_KEY is not set")
+    ca_bundle = os.getenv("CA_BUNDLE")
+    ssl_context = _ssl_context(ca_bundle)
+    return OpenAIChatClient(
+        base_url,
+        settings.qa.model,
         api_key,
-        timeout_seconds=settings.groq.request_timeout_seconds,
+        timeout_seconds=settings.qa.request_timeout_seconds,
         temperature=settings.generation.temperature,
         max_tokens=settings.generation.max_tokens,
-        reasoning_effort=settings.groq.reasoning_effort,
+        reasoning_effort=settings.qa.reasoning_effort,
         ssl_context=ssl_context,
     )
 
 
-def _groq_ssl_context(ca_bundle: str | None) -> ssl.SSLContext:
+def _ssl_context(ca_bundle: str | None) -> ssl.SSLContext:
     if ca_bundle:
         path = Path(ca_bundle).expanduser()
         if not path.is_file():
-            raise ValueError(
-                f"CA bundle from GROQ_CA_BUNDLE does not exist: {path}"
-            )
+            raise ValueError(f"CA bundle from CA_BUNDLE does not exist: {path}")
         return ssl.create_default_context(cafile=str(path))
     return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
@@ -136,6 +146,7 @@ def build_agent_runnable(settings: Settings) -> Runnable[Any, dict[str, Any]]:
         summary_max_tokens=settings.summarization.max_tokens,
         summary_temperature=settings.summarization.temperature,
         summary_think=settings.summarization.think,
+        generation_think=settings.generation.think,
         summarize_query=settings.summarization.enabled,
     )
     return agent
