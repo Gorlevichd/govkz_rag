@@ -61,9 +61,9 @@ def build_eval_set(
     config_path: Path = PROJECT_ROOT / "config.yaml",
 ) -> None:
     settings = Settings.from_yaml(config_path)
-    client = chromadb.PersistentClient(path=str(settings.chroma.path))
+    client = chromadb.PersistentClient(path=str(settings.retrieval.chroma.path))
     collection = client.get_collection(
-        f"{settings.chroma.collection}_documents",
+        f"{settings.retrieval.chroma.collection}_documents",
         embedding_function=None,
     )
     requested_ids = [str(case.relevant_document_id) for case in CASES]

@@ -28,7 +28,7 @@ def main() -> None:
     _configure_utf8_console()
     load_dotenv(PROJECT_ROOT / ".env", override=False)
     settings = Settings.from_yaml(PROJECT_ROOT / "config.yaml")
-    if settings.server.warmup_embedding:
+    if settings.app.server.warmup_embedding:
         started = perf_counter()
         asyncio.run(warmup_embedding(settings))
         print(
@@ -38,8 +38,8 @@ def main() -> None:
         )
     uvicorn.run(
         create_app(settings=settings),
-        host=settings.server.host,
-        port=settings.server.port,
+        host=settings.app.server.host,
+        port=settings.app.server.port,
     )
 
 

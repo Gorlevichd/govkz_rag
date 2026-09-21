@@ -1,66 +1,70 @@
-data:
-  workbook: data/egov_ru.xlsx
-
-chroma:
-  path: data/chroma
-  collection: egov_services
-
-ollama:
-  embedding_model: qwen3-embedding:0.6b
-  request_timeout_seconds: 180
-  embedding_keep_alive: 5m
-
-qa:
-  provider: ollama
-  model: qwen3:4b
-  request_timeout_seconds: 240
-  reasoning_effort: none
-  keep_alive: 5m
-
-index:
-  batch_size: 64
-  embedding_keep_alive: 5m
-
 retrieval:
-  top_k: 3
-  candidate_k: 30
-  rrf_k: 60
-  alias_candidate_multiplier: 4
-  min_semantic_similarity: 0.6
+  data:
+    workbook: data/egov_ru.xlsx
 
-reranker:
-  enabled: true
-  model: models/mmarco-mMiniLMv2-L12-h384-v1
-  candidate_k: 10
-  min_score: 0.0
-  max_length: 512
-  max_passage_chars: 4000
-  batch_size: 8
-  device: cpu
+  chroma:
+    path: data/chroma
+    collection: egov_services
 
-evaluation:
-  dataset: evals/rag_eval_30.jsonl
+  embedding:
+    model: qwen3-embedding:0.6b
+    request_timeout_seconds: 180
+    keep_alive: 5m
 
-summarization:
-  enabled: false
-  max_tokens: 64
-  temperature: 0.0
-  think: false
+  index:
+    batch_size: 64
+    keep_alive: 5m
 
-generation:
-  max_context_chars: 3000
-  max_tokens: 1000
-  temperature: 0.1
-  think: false
+  search:
+    top_k: 3
+    candidate_k: 30
+    rrf_k: 60
+    alias_candidate_multiplier: 4
+    min_semantic_similarity: 0.6
 
-server:
-  host: 127.0.0.1
-  port: 8000
-  warmup_embedding: true
+  reranker:
+    enabled: true
+    model: models/mmarco-mMiniLMv2-L12-h384-v1
+    candidate_k: 10
+    min_score: 0.0
+    max_length: 512
+    max_passage_chars: 4000
+    batch_size: 8
+    device: cpu
 
-frontend:
-  request_timeout_seconds: 240
+  evaluation:
+    dataset: evals/rag_eval_30.jsonl
 
-langfuse:
-  enabled: false
-  run_name: egov-question
+agent:
+  qa:
+    provider: ollama
+    model: qwen3:4b
+    request_timeout_seconds: 240
+    reasoning_effort: none
+    keep_alive: 5m
+
+  summarization:
+    enabled: false
+    max_tokens: 64
+    temperature: 0.0
+    think: false
+
+  generation:
+    max_context_chars: 3000
+    max_tokens: 1000
+    temperature: 0.1
+    think: false
+
+observability:
+  langfuse:
+    enabled: false
+    run_name: egov-question
+
+app:
+  server:
+    host: 127.0.0.1
+    port: 8000
+    warmup_embedding: true
+
+  frontend:
+    request_timeout_seconds: 240

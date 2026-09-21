@@ -25,22 +25,22 @@ LOGGER = logging.getLogger("uvicorn.error")
 def build_embedding_client(settings: Settings) -> OllamaEmbeddingClient:
     return OllamaEmbeddingClient(
         OLLAMA_BASE_URL,
-        settings.ollama.embedding_model,
-        timeout_seconds=settings.ollama.request_timeout_seconds,
-        embedding_keep_alive=settings.ollama.embedding_keep_alive,
+        settings.retrieval.embedding.model,
+        timeout_seconds=settings.retrieval.embedding.request_timeout_seconds,
+        embedding_keep_alive=settings.retrieval.embedding.keep_alive,
     )
 
 
 def build_chat_client(settings: Settings) -> ChatModel:
-    if settings.qa.provider == "ollama":
+    if settings.agent.qa.provider == "ollama":
         return OllamaChatClient(
             OLLAMA_BASE_URL,
-            settings.qa.model,
-            timeout_seconds=settings.qa.request_timeout_seconds,
-            temperature=settings.generation.temperature,
-            max_tokens=settings.generation.max_tokens,
-            reasoning_effort=settings.qa.reasoning_effort,
-            keep_alive=settings.qa.keep_alive,
+            settings.agent.qa.model,
+            timeout_seconds=settings.agent.qa.request_timeout_seconds,
+            temperature=settings.agent.generation.temperature,
+            max_tokens=settings.agent.generation.max_tokens,
+            reasoning_effort=settings.agent.qa.reasoning_effort,
+            keep_alive=settings.agent.qa.keep_alive,
         )
 
     base_url = os.getenv("BASE_URL")
@@ -53,12 +53,12 @@ def build_chat_client(settings: Settings) -> ChatModel:
     ssl_context = _ssl_context(ca_bundle)
     return OpenAIChatClient(
         base_url,
-        settings.qa.model,
+        settings.agent.qa.model,
         api_key,
-        timeout_seconds=settings.qa.request_timeout_seconds,
-        temperature=settings.generation.temperature,
-        max_tokens=settings.generation.max_tokens,
-        reasoning_effort=settings.qa.reasoning_effort,
+        timeout_seconds=settings.agent.qa.request_timeout_seconds,
+        temperature=settings.agent.generation.temperature,
+        max_tokens=settings.agent.generation.max_tokens,
+        reasoning_effort=settings.agent.qa.reasoning_effort,
         ssl_context=ssl_context,
     )
 
@@ -117,37 +117,37 @@ def build_agent_runnable(settings: Settings) -> Runnable[Any, dict[str, Any]]:
     embedder = build_embedding_client(settings)
     chat_model = build_chat_client(settings)
     reranker = None
-    if settings.reranker.enabled:
+    if settings.retrieval.reranker.enabled:
         reranker = CrossEncoderReranker(
-            settings.reranker.model,
-            min_score=settings.reranker.min_score,
-            max_length=settings.reranker.max_length,
-            max_passage_chars=settings.reranker.max_passage_chars,
-            batch_size=settings.reranker.batch_size,
-            device=settings.reranker.device,
+            settings.retrieval.reranker.model,
+            min_score=settings.retrieval.reranker.min_score,
+            max_length=settings.retrieval.reranker.max_length,
+            max_passage_chars=settings.retrieval.reranker.max_passage_chars,
+            batch_size=settings.retrieval.reranker.batch_size,
+            device=settings.retrieval.reranker.device,
         )
     retriever = ChromaRetriever.from_path(
-        settings.chroma.path,
-        settings.chroma.collection,
+        settings.retrieval.chroma.path,
+        settings.retrieval.chroma.collection,
         embedder,
-        candidate_k=settings.retrieval.candidate_k,
-        rrf_k=settings.retrieval.rrf_k,
-        alias_candidate_multiplier=settings.retrieval.alias_candidate_multiplier,
-        min_semantic_similarity=settings.retrieval.min_semantic_similarity,
+        candidate_k=settings.retrieval.search.candidate_k,
+        rrf_k=settings.retrieval.search.rrf_k,
+        alias_candidate_multiplier=settings.retrieval.search.alias_candidate_multiplier,
+        min_semantic_similarity=settings.retrieval.search.min_semantic_similarity,
         reranker=reranker,
-        reranker_candidate_k=settings.reranker.candidate_k,
+        reranker_candidate_k=settings.retrieval.reranker.candidate_k,
     )
     agent = build_agent(
         retriever,
         chat_model,
-        top_k=settings.retrieval.top_k,
-        min_semantic_similarity=settings.retrieval.min_semantic_similarity,
-        max_context_chars=settings.generation.max_context_chars,
-        summary_max_tokens=settings.summarization.max_tokens,
-        summary_temperature=settings.summarization.temperature,
-        summary_think=settings.summarization.think,
-        generation_think=settings.generation.think,
-        summarize_query=settings.summarization.enabled,
+        top_k=settings.retrieval.search.top_k,
+        min_semantic_similarity=settings.retrieval.search.min_semantic_similarity,
+        max_context_chars=settings.agent.generation.max_context_chars,
+        summary_max_tokens=settings.agent.summarization.max_tokens,
+        summary_temperature=settings.agent.summarization.temperature,
+        summary_think=settings.agent.summarization.think,
+        generation_think=settings.agent.generation.think,
+        summarize_query=settings.agent.summarization.enabled,
     )
     return agent
 
@@ -160,12 +160,12 @@ def build_question_runnables(settings: Settings) -> tuple[Runnable, Runnable]:
         input_type=QuestionRequest,
         output_type=AnswerResponse,
     )
-    handler = create_langfuse_handler(settings.langfuse.enabled)
+    handler = create_langfuse_handler(settings.observability.langfuse.enabled)
     if handler is None:
         return runnable, structured
     config = {
         "callbacks": [handler],
-        "run_name": settings.langfuse.run_name,
+        "run_name": settings.observability.langfuse.run_name,
     }
     return runnable.with_config(**config), structured.with_config(**config)
 

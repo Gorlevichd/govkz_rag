@@ -135,7 +135,10 @@ def request_answer(
 
 def main() -> None:
     settings = Settings.from_yaml(PROJECT_ROOT / "config.yaml")
-    api_url = backend_api_url(settings.server.host, settings.server.port)
+    api_url = backend_api_url(
+        settings.app.server.host,
+        settings.app.server.port,
+    )
     st.set_page_config(
         page_title="Государственные услуги Казахстана",
         page_icon="🇰🇿",
@@ -176,7 +179,7 @@ def main() -> None:
         with st.spinner("Запускаем сервис и локальные модели…"):
             ensure_backend(
                 api_url,
-                settings.frontend.request_timeout_seconds,
+                settings.app.frontend.request_timeout_seconds,
             )
     except BackendStartupError as exc:
         st.error(str(exc))
@@ -201,7 +204,7 @@ def main() -> None:
             result = request_answer(
                 question.strip(),
                 api_url,
-                settings.frontend.request_timeout_seconds,
+                settings.app.frontend.request_timeout_seconds,
             )
     except FrontendRequestError as exc:
         st.error(str(exc))
@@ -218,12 +221,6 @@ def main() -> None:
                     st.write(answer)
                 else:
                     st.caption("Текст источника недоступен.")
-
-    if result.useful_links:
-        with st.expander("Полезные ссылки"):
-            for url in result.useful_links:
-                st.markdown(f"- [{url}]({url})")
-
 
 if __name__ == "__main__":
     main()

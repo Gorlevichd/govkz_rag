@@ -30,6 +30,13 @@ Embeddings, the search index, and reranking stay local. By default, answer
 generation also runs locally through Ollama. An external OpenAI-compatible API
 can be enabled when needed.
 
+## Use case example
+
+The user asks how to register a marriage. The application returns a practical,
+source-grounded answer and lists the original eGov records used as evidence.
+
+![Marriage registration question answered with supporting eGov sources](docs/images/marriage-registration-use-case.png)
+
 ## RAG evaluation
 
 The repository includes a 30-question Russian retrieval set in
@@ -88,12 +95,13 @@ models/mmarco-mMiniLMv2-L12-h384-v1/
 **Local Ollama is the default QA provider.** The checked-in configuration is:
 
 ```yaml
-qa:
-  provider: ollama
-  model: qwen3:4b
-  request_timeout_seconds: 240
-  reasoning_effort: none
-  keep_alive: 5m
+agent:
+  qa:
+    provider: ollama
+    model: qwen3:4b
+    request_timeout_seconds: 240
+    reasoning_effort: none
+    keep_alive: 5m
 ```
 
 It requires no API key and keeps retrieved evidence and generated answers on the
@@ -104,14 +112,15 @@ main performance bottleneck.** Use a smaller Ollama model or an external service
 when response latency is too high.
 
 To use any service that implements the OpenAI-compatible Chat Completions API,
-replace the `qa` section with:
+replace the `agent.qa` section with:
 
 ```yaml
-qa:
-  provider: openai
-  model: provider-model-name
-  request_timeout_seconds: 120
-  reasoning_effort: none
+agent:
+  qa:
+    provider: openai
+    model: provider-model-name
+    request_timeout_seconds: 120
+    reasoning_effort: none
 ```
 
 Then put the external API token in `.env`:
@@ -138,7 +147,8 @@ streamlit run serve.py
 
 `serve.py` starts the LangServe backend automatically. The API documentation is
 available at `http://127.0.0.1:8000/docs`. Runtime settings, including model names,
-retrieval thresholds, and server addresses, are in `config.yaml`.
+retrieval thresholds, and server addresses, are grouped under `retrieval`, `agent`,
+`observability`, and `app` in `config.yaml`.
 
 ## Tests
 

@@ -21,32 +21,32 @@ async def run() -> None:
     settings = Settings.from_yaml(PROJECT_ROOT / "config.yaml")
     client = OllamaEmbeddingClient(
         OLLAMA_BASE_URL,
-        settings.ollama.embedding_model,
-        timeout_seconds=settings.ollama.request_timeout_seconds,
-        embedding_keep_alive=settings.index.embedding_keep_alive,
+        settings.retrieval.embedding.model,
+        timeout_seconds=settings.retrieval.embedding.request_timeout_seconds,
+        embedding_keep_alive=settings.retrieval.index.keep_alive,
     )
     reranker = None
-    if settings.reranker.enabled:
+    if settings.retrieval.reranker.enabled:
         reranker = CrossEncoderReranker(
-            settings.reranker.model,
-            min_score=settings.reranker.min_score,
-            max_length=settings.reranker.max_length,
-            max_passage_chars=settings.reranker.max_passage_chars,
-            batch_size=settings.reranker.batch_size,
-            device=settings.reranker.device,
+            settings.retrieval.reranker.model,
+            min_score=settings.retrieval.reranker.min_score,
+            max_length=settings.retrieval.reranker.max_length,
+            max_passage_chars=settings.retrieval.reranker.max_passage_chars,
+            batch_size=settings.retrieval.reranker.batch_size,
+            device=settings.retrieval.reranker.device,
         )
     retriever = ChromaRetriever.from_path(
-        settings.chroma.path,
-        settings.chroma.collection,
+        settings.retrieval.chroma.path,
+        settings.retrieval.chroma.collection,
         client,
-        candidate_k=settings.retrieval.candidate_k,
-        rrf_k=settings.retrieval.rrf_k,
-        alias_candidate_multiplier=settings.retrieval.alias_candidate_multiplier,
-        min_semantic_similarity=settings.retrieval.min_semantic_similarity,
+        candidate_k=settings.retrieval.search.candidate_k,
+        rrf_k=settings.retrieval.search.rrf_k,
+        alias_candidate_multiplier=settings.retrieval.search.alias_candidate_multiplier,
+        min_semantic_similarity=settings.retrieval.search.min_semantic_similarity,
         reranker=reranker,
-        reranker_candidate_k=settings.reranker.candidate_k,
+        reranker_candidate_k=settings.retrieval.reranker.candidate_k,
     )
-    cases = load_eval_cases(settings.evaluation.dataset)
+    cases = load_eval_cases(settings.retrieval.evaluation.dataset)
 
     def show_progress(current: int, total: int, eval_id: str) -> None:
         print(f"\rEvaluating {current}/{total}: {eval_id}", end="", flush=True)
@@ -54,7 +54,7 @@ async def run() -> None:
     results, summary = await evaluate_retrieval(
         retriever,
         cases,
-        settings.retrieval.top_k,
+        settings.retrieval.search.top_k,
         progress=show_progress,
     )
     print("\n")

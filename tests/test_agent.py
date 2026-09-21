@@ -72,9 +72,9 @@ def test_agent_generates_only_after_sufficient_retrieval() -> None:
     assert "Не показывай ход рассуждений" in model.requests[0][0]["content"]
     assert "/no_think" in model.requests[0][0]["content"]
     assert "Не показывай ход рассуждений" in model.requests[-1][0]["content"]
-    assert "строго 1–2 коротких предложения" in model.requests[-1][0]["content"]
-    assert "не более\n350 символов" in model.requests[-1][0]["content"]
-    assert "не перечисляй" in model.requests[-1][0]["content"].casefold()
+    assert "Объем ответа должен соответствовать" in model.requests[-1][0]["content"]
+    assert "обычно 3–7 предложений" in model.requests[-1][0]["content"]
+    assert "маркированный или нумерованный список" in model.requests[-1][0]["content"]
     assert model.options[-1]["response_format"]["required"] == ["answer"]
     assert "Заявление можно подать" in model.requests[-1][-1]["content"]
 

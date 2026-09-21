@@ -109,48 +109,54 @@ async def test_stream_log_endpoint_is_registered(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_public_runnable_returns_only_final_answer(monkeypatch) -> None:
     settings = SimpleNamespace(
-        ollama=SimpleNamespace(
-            embedding_model="embedding",
-            request_timeout_seconds=30,
-            embedding_keep_alive=0,
-        ),
-        qa=SimpleNamespace(
-            provider="openai",
-            model="provider-model",
-            request_timeout_seconds=30,
-            reasoning_effort="none",
-        ),
-        generation=SimpleNamespace(
-            temperature=0.1,
-            max_context_chars=1000,
-            max_tokens=128,
-            think=False,
-        ),
-        chroma=SimpleNamespace(path="unused", collection="test"),
         retrieval=SimpleNamespace(
-            candidate_k=5,
-            rrf_k=60,
-            alias_candidate_multiplier=4,
-            top_k=3,
-            min_semantic_similarity=0.6,
+            embedding=SimpleNamespace(
+                model="embedding",
+                request_timeout_seconds=30,
+                keep_alive=0,
+            ),
+            chroma=SimpleNamespace(path="unused", collection="test"),
+            search=SimpleNamespace(
+                candidate_k=5,
+                rrf_k=60,
+                alias_candidate_multiplier=4,
+                top_k=3,
+                min_semantic_similarity=0.6,
+            ),
+            reranker=SimpleNamespace(
+                enabled=False,
+                model="unused",
+                candidate_k=10,
+                min_score=0.0,
+                max_length=512,
+                max_passage_chars=4000,
+                batch_size=8,
+                device="cpu",
+            ),
         ),
-        reranker=SimpleNamespace(
-            enabled=False,
-            model="unused",
-            candidate_k=10,
-            min_score=0.0,
-            max_length=512,
-            max_passage_chars=4000,
-            batch_size=8,
-            device="cpu",
+        agent=SimpleNamespace(
+            qa=SimpleNamespace(
+                provider="openai",
+                model="provider-model",
+                request_timeout_seconds=30,
+                reasoning_effort="none",
+            ),
+            generation=SimpleNamespace(
+                temperature=0.1,
+                max_context_chars=1000,
+                max_tokens=128,
+                think=False,
+            ),
+            summarization=SimpleNamespace(
+                enabled=False,
+                max_tokens=64,
+                temperature=0.0,
+                think=False,
+            ),
         ),
-        summarization=SimpleNamespace(
-            enabled=False,
-            max_tokens=64,
-            temperature=0.0,
-            think=False,
+        observability=SimpleNamespace(
+            langfuse=SimpleNamespace(enabled=False, run_name="test-question"),
         ),
-        langfuse=SimpleNamespace(enabled=False, run_name="test-question"),
     )
     monkeypatch.setattr(
         runnable_module.ChromaRetriever,
@@ -179,14 +185,16 @@ async def test_public_runnable_returns_only_final_answer(monkeypatch) -> None:
 
 def test_local_qa_client_does_not_require_api_key(monkeypatch) -> None:
     settings = SimpleNamespace(
-        qa=SimpleNamespace(
-            provider="ollama",
-            model="qwen3:8b",
-            request_timeout_seconds=30,
-            reasoning_effort="none",
-            keep_alive="5m",
+        agent=SimpleNamespace(
+            qa=SimpleNamespace(
+                provider="ollama",
+                model="qwen3:8b",
+                request_timeout_seconds=30,
+                reasoning_effort="none",
+                keep_alive="5m",
+            ),
+            generation=SimpleNamespace(temperature=0.1, max_tokens=128),
         ),
-        generation=SimpleNamespace(temperature=0.1, max_tokens=128),
     )
     monkeypatch.delenv("API_KEY", raising=False)
 
@@ -197,13 +205,15 @@ def test_local_qa_client_does_not_require_api_key(monkeypatch) -> None:
 
 def test_external_qa_client_requires_fixed_api_key(monkeypatch) -> None:
     settings = SimpleNamespace(
-        qa=SimpleNamespace(
-            provider="openai",
-            model="model",
-            request_timeout_seconds=30,
-            reasoning_effort="none",
+        agent=SimpleNamespace(
+            qa=SimpleNamespace(
+                provider="openai",
+                model="model",
+                request_timeout_seconds=30,
+                reasoning_effort="none",
+            ),
+            generation=SimpleNamespace(temperature=0.1, max_tokens=128),
         ),
-        generation=SimpleNamespace(temperature=0.1, max_tokens=128),
     )
     monkeypatch.setenv("BASE_URL", "https://api.example.test/v1")
     monkeypatch.delenv("API_KEY", raising=False)

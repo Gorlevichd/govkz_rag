@@ -6,11 +6,15 @@ import backend
 
 def _settings() -> SimpleNamespace:
     return SimpleNamespace(
-        chroma=SimpleNamespace(path="data/chroma", collection="egov_services"),
-        server=SimpleNamespace(
-            host="127.0.0.1",
-            port=8000,
-            warmup_embedding=True,
+        retrieval=SimpleNamespace(
+            chroma=SimpleNamespace(path="data/chroma", collection="egov_services"),
+        ),
+        app=SimpleNamespace(
+            server=SimpleNamespace(
+                host="127.0.0.1",
+                port=8000,
+                warmup_embedding=True,
+            ),
         ),
     )
 

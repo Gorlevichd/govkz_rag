@@ -20,12 +20,12 @@ class ChromaSettings(BaseModel):
     collection: str = Field(min_length=1)
 
 
-class OllamaSettings(BaseModel):
+class EmbeddingSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    embedding_model: str = Field(min_length=1)
+    model: str = Field(min_length=1)
     request_timeout_seconds: float = Field(gt=0)
-    embedding_keep_alive: str | int
+    keep_alive: str | int
 
 
 class OllamaQaSettings(BaseModel):
@@ -57,10 +57,10 @@ class IndexSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     batch_size: PositiveInt
-    embedding_keep_alive: str | int
+    keep_alive: str | int
 
 
-class RetrievalSettings(BaseModel):
+class SearchSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     top_k: PositiveInt
@@ -128,22 +128,46 @@ class LangfuseSettings(BaseModel):
     run_name: str = Field(min_length=1)
 
 
-class Settings(BaseModel):
+class RetrievalSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     data: DataSettings
     chroma: ChromaSettings
-    ollama: OllamaSettings
-    qa: QaSettings
+    embedding: EmbeddingSettings
     index: IndexSettings
-    retrieval: RetrievalSettings
+    search: SearchSettings
     reranker: RerankerSettings
     evaluation: EvaluationSettings
+
+
+class AgentSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    qa: QaSettings
     summarization: SummarizationSettings
     generation: GenerationSettings
+
+
+class ObservabilitySettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    langfuse: LangfuseSettings
+
+
+class AppSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     server: ServerSettings
     frontend: FrontendSettings
-    langfuse: LangfuseSettings
+
+
+class Settings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    retrieval: RetrievalSettings
+    agent: AgentSettings
+    observability: ObservabilitySettings
+    app: AppSettings
 
     @classmethod
     def from_yaml(cls, path: Path = Path("config.yaml")) -> "Settings":
@@ -153,19 +177,24 @@ class Settings(BaseModel):
             yaml.safe_load(path.read_text(encoding="utf-8"))
         )
         base = path.resolve().parent
+        retrieval = settings.retrieval
         return settings.model_copy(
             update={
-                "data": settings.data.model_copy(
-                    update={"workbook": base / settings.data.workbook}
-                ),
-                "chroma": settings.chroma.model_copy(
-                    update={"path": base / settings.chroma.path}
-                ),
-                "evaluation": settings.evaluation.model_copy(
-                    update={"dataset": base / settings.evaluation.dataset}
-                ),
-                "reranker": settings.reranker.model_copy(
-                    update={"model": base / settings.reranker.model}
+                "retrieval": retrieval.model_copy(
+                    update={
+                        "data": retrieval.data.model_copy(
+                            update={"workbook": base / retrieval.data.workbook}
+                        ),
+                        "chroma": retrieval.chroma.model_copy(
+                            update={"path": base / retrieval.chroma.path}
+                        ),
+                        "evaluation": retrieval.evaluation.model_copy(
+                            update={"dataset": base / retrieval.evaluation.dataset}
+                        ),
+                        "reranker": retrieval.reranker.model_copy(
+                            update={"model": base / retrieval.reranker.model}
+                        ),
+                    }
                 ),
             }
         )

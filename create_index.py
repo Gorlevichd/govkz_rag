@@ -20,17 +20,17 @@ from govkz_rag.retrieval import (  # noqa: E402
 def _client(settings: Settings) -> OllamaEmbeddingClient:
     return OllamaEmbeddingClient(
         OLLAMA_BASE_URL,
-        settings.ollama.embedding_model,
-        timeout_seconds=settings.ollama.request_timeout_seconds,
-        embedding_keep_alive=settings.index.embedding_keep_alive,
+        settings.retrieval.embedding.model,
+        timeout_seconds=settings.retrieval.embedding.request_timeout_seconds,
+        embedding_keep_alive=settings.retrieval.index.keep_alive,
     )
 
 
 def _confirm_overwrite(settings: Settings) -> bool:
     try:
         response = input(
-            f"Index '{settings.chroma.collection}' already exists at "
-            f"{settings.chroma.path}. Overwrite it? [y/N]: "
+            f"Index '{settings.retrieval.chroma.collection}' already exists at "
+            f"{settings.retrieval.chroma.path}. Overwrite it? [y/N]: "
         )
     except EOFError:
         return False
@@ -38,7 +38,7 @@ def _confirm_overwrite(settings: Settings) -> bool:
 
 
 async def _build_index(settings: Settings) -> None:
-    documents = load_documents(settings.data.workbook)
+    documents = load_documents(settings.retrieval.data.workbook)
     alias_count = sum(len(document.alternative_queries) for document in documents)
 
     def show_progress(completed: int, total: int) -> None:
@@ -50,21 +50,25 @@ async def _build_index(settings: Settings) -> None:
     count = await rebuild_collection(
         documents,
         _client(settings),
-        settings.chroma.path,
-        settings.chroma.collection,
-        batch_size=settings.index.batch_size,
+        settings.retrieval.chroma.path,
+        settings.retrieval.chroma.collection,
+        batch_size=settings.retrieval.index.batch_size,
         progress=show_progress,
     )
     print(
         f"Indexed {count} canonical services from {alias_count} query aliases with "
-        f"{settings.ollama.embedding_model} into "
-        f"'{settings.chroma.collection}' at {settings.chroma.path}"
+        f"{settings.retrieval.embedding.model} into "
+        f"'{settings.retrieval.chroma.collection}' at "
+        f"{settings.retrieval.chroma.path}"
     )
 
 
 def main() -> None:
     settings = Settings.from_yaml(PROJECT_ROOT / "config.yaml")
-    if collection_exists(settings.chroma.path, settings.chroma.collection):
+    if collection_exists(
+        settings.retrieval.chroma.path,
+        settings.retrieval.chroma.collection,
+    ):
         if not _confirm_overwrite(settings):
             print("Index build cancelled. Existing index was not changed.")
             return
