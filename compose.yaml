@@ -8,6 +8,10 @@ services:
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
+    environment:
+      OLLAMA_DEBUG: "-1"
+    logging:
+      driver: "none"
     volumes:
       - ollama-models:/root/.ollama
     ports:
