@@ -87,5 +87,16 @@ Example:
 - White background with large search bar. 
 - Display loading spinner while use waits for the response.
 - List sources as expandable elements after the text answer
-- Make the "Полезные ссылки" (links) block expandable
+- Source element has a header with source title and contains expandable answer text
+- For the frontend, citation numbers should be removed from text
 - Reference: Google main page
+
+# Deployment
+
+- App is deployed with docker compose
+- On build the app should:
+    - Pull ollama image
+    - Download the required ollama models
+    - Download the dataset from http://magda-minio-web.data.gov.kz/magda-datasets/egov_ru.xlsx
+    - Download the Chroma index from the Github Releases or rebuild it from data. The choice between using an existing index and rebuilding should be configurable in compose.yaml
+    - Start backend in a separate container before serving a web app

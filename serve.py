@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import atexit
+import os
 import re
-import subprocess
 import sys
-import time
 from pathlib import Path
 from typing import Any
 
@@ -24,10 +22,6 @@ class FrontendRequestError(RuntimeError):
     pass
 
 
-class BackendStartupError(RuntimeError):
-    pass
-
-
 REFERENCE_NUMBER_PATTERN = re.compile(r"(?:\s*\[\d+\])+")
 
 
@@ -38,6 +32,10 @@ def without_reference_numbers(answer: str) -> str:
 def backend_api_url(host: str, port: int) -> str:
     client_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
     return f"http://{client_host}:{port}/ask/invoke"
+
+
+def configured_backend_url(host: str, port: int) -> str:
+    return os.getenv("BACKEND_URL") or backend_api_url(host, port)
 
 
 def _backend_health_url(api_url: str) -> str:
@@ -54,51 +52,6 @@ def backend_is_ready(api_url: str) -> bool:
     return True
 
 
-def _stop_backend(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
-    process.terminate()
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-
-
-@st.cache_resource
-def _start_backend() -> subprocess.Popen[bytes]:
-    process = subprocess.Popen(
-        [sys.executable, str(PROJECT_ROOT / "backend.py")],
-        cwd=PROJECT_ROOT,
-    )
-    atexit.register(_stop_backend, process)
-    return process
-
-
-def ensure_backend(api_url: str, timeout_seconds: float) -> None:
-    if backend_is_ready(api_url):
-        return
-
-    process = _start_backend()
-    if process.poll() is not None:
-        _start_backend.clear()
-        process = _start_backend()
-
-    deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
-        if backend_is_ready(api_url):
-            return
-        return_code = process.poll()
-        if return_code is not None:
-            raise BackendStartupError(
-                f"Backend не запустился (код завершения {return_code})."
-            )
-        time.sleep(0.25)
-
-    raise BackendStartupError(
-        "Backend не успел запуститься. Проверьте Ollama и локальные модели."
-    )
-
-
 def request_answer(
     question: str,
     api_url: str,
@@ -113,7 +66,7 @@ def request_answer(
         response.raise_for_status()
     except httpx.ConnectError as exc:
         raise FrontendRequestError(
-            "Сервис ответов недоступен. Перезапустите Streamlit-приложение."
+            "Сервис ответов недоступен. Проверьте backend."
         ) from exc
     except httpx.TimeoutException as exc:
         raise FrontendRequestError(
@@ -135,9 +88,8 @@ def request_answer(
 
 def main() -> None:
     settings = Settings.from_yaml(PROJECT_ROOT / "config.yaml")
-    api_url = backend_api_url(
-        settings.app.server.host,
-        settings.app.server.port,
+    api_url = configured_backend_url(
+        settings.app.server.host, settings.app.server.port
     )
     st.set_page_config(
         page_title="Государственные услуги Казахстана",
@@ -175,14 +127,8 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    try:
-        with st.spinner("Запускаем сервис и локальные модели…"):
-            ensure_backend(
-                api_url,
-                settings.app.frontend.request_timeout_seconds,
-            )
-    except BackendStartupError as exc:
-        st.error(str(exc))
+    if not backend_is_ready(api_url):
+        st.error("Сервис ответов недоступен. Проверьте backend.")
         return
 
     with st.form("question_form"):

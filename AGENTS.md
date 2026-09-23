@@ -5,6 +5,12 @@
 This is a Python project for a government information retrieval agent
 focused on Kazakhstan government websites.
 
+## Workflow
+- Do not implement code changes before approval
+- Briefly describe the intended changes and reasoning behind them and ask for approval
+- If a task is complex, decompose it into smaller parts
+- Implement large changes step by step with approval on each step
+
 ## Architecture
 
 - Use LangGraph for agent orchestration.

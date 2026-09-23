@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 from time import perf_counter
@@ -38,7 +39,7 @@ def main() -> None:
         )
     uvicorn.run(
         create_app(settings=settings),
-        host=settings.app.server.host,
+        host=os.getenv("SERVER_HOST", settings.app.server.host),
         port=settings.app.server.port,
     )
 

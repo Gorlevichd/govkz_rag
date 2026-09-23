@@ -66,16 +66,20 @@ python eval.py
 
 Docker Compose provides the simplest complete installation. It downloads and
 validates the public eGov workbook, downloads the pinned Hugging Face reranker,
-pulls the required Ollama models, builds the Chroma index, and then starts the
-application:
+pulls the required Ollama models, builds the Chroma index, then starts a separate
+LangServe backend before the Streamlit frontend:
 
 ```powershell
-docker compose up --build
+docker compose up --build --remove-orphans -d
 ```
 
-Open `http://localhost:8501`. The first start can take several minutes because it
-downloads model weights and creates the index. Docker volumes preserve the dataset,
-reranker, Ollama models, and index for later starts.
+Open `http://localhost:8501` on the Docker host. Only the frontend is published,
+and only on `127.0.0.1`; use an SSH tunnel when running on a remote VM. The backend
+and Ollama are reachable only by other Compose containers. The first start can
+take several minutes because it downloads model weights and creates the index.
+Docker volumes preserve the dataset, reranker, Ollama models, and index for later
+starts. Check startup with `docker compose ps` and
+`docker compose logs -f backend frontend`.
 
 The initializers use these public sources:
 
@@ -167,16 +171,21 @@ Build the local Chroma index:
 python create_index.py
 ```
 
-Start the application:
+Start the backend and frontend in separate terminals:
+
+```powershell
+python backend.py
+```
 
 ```powershell
 streamlit run serve.py
 ```
 
-`serve.py` starts the LangServe backend automatically. The API documentation is
-available at `http://127.0.0.1:8000/docs`. Runtime settings, including model names,
-retrieval thresholds, and server addresses, are grouped under `retrieval`, `agent`,
-`observability`, and `app` in `config.yaml`.
+The frontend connects to `http://127.0.0.1:8000/ask/invoke` by default; set
+`BACKEND_URL` to a different LangServe endpoint when needed. The API documentation
+is available at `http://127.0.0.1:8000/docs`. Runtime settings, including model
+names, retrieval thresholds, and server addresses, are grouped under `retrieval`,
+`agent`, `observability`, and `app` in `config.yaml`.
 
 ## Tests
 

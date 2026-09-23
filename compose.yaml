@@ -14,8 +14,6 @@ services:
       driver: "none"
     volumes:
       - ollama-models:/root/.ollama
-    ports:
-      - "127.0.0.1:11434:11434"
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 5s
@@ -60,10 +58,12 @@ services:
       ollama-init:
         condition: service_completed_successfully
 
-  app:
+  backend:
     <<: *app-image
+    command: ["python", "backend.py"]
     restart: unless-stopped
     environment:
+      SERVER_HOST: 0.0.0.0
       OLLAMA_BASE_URL: http://ollama:11434
       BASE_URL: ${BASE_URL:-}
       API_KEY: ${API_KEY:-}
@@ -75,14 +75,34 @@ services:
       - dataset:/app/data:ro
       - chroma-index:/app/data/chroma
       - reranker-models:/app/models:ro
-    ports:
-      - "8501:8501"
     depends_on:
       assets-init:
         condition: service_completed_successfully
       index-init:
         condition: service_completed_successfully
       ollama:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json', timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+
+  frontend:
+    <<: *app-image
+    command: ["streamlit", "run", "serve.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true"]
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:8000/ask/invoke
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      backend:
         condition: service_healthy
     healthcheck:
       test:

@@ -57,3 +57,22 @@ def test_backend_uses_configured_host_and_port(monkeypatch) -> None:
 
     assert called == {"app": app, "host": "127.0.0.1", "port": 8000}
     assert warmed_up == [settings]
+
+
+def test_backend_accepts_container_bind_address(monkeypatch) -> None:
+    settings = _settings()
+    monkeypatch.setenv("SERVER_HOST", "0.0.0.0")
+    monkeypatch.setattr(backend.Settings, "from_yaml", lambda path: settings)
+    monkeypatch.setattr(backend, "_configure_utf8_console", lambda: None)
+    monkeypatch.setattr(backend, "load_dotenv", lambda *args, **kwargs: None)
+    monkeypatch.setattr(backend, "create_app", lambda settings: object())
+    called: dict[str, object] = {}
+    monkeypatch.setattr(backend.uvicorn, "run", lambda app, **kwargs: called.update(kwargs))
+
+    async def fake_warmup(current) -> None:
+        pass
+
+    monkeypatch.setattr(backend, "warmup_embedding", fake_warmup)
+    backend.main()
+
+    assert called["host"] == "0.0.0.0"

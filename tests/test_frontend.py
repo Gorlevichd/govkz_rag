@@ -11,9 +11,13 @@ def test_backend_api_url_uses_connectable_loopback_address() -> None:
     )
 
 
-class FakeProcess:
-    def poll(self) -> None:
-        return None
+def test_backend_url_uses_compose_override(monkeypatch) -> None:
+    monkeypatch.setenv("BACKEND_URL", "http://backend:8000/ask/invoke")
+
+    assert (
+        serve.configured_backend_url("127.0.0.1", 8000)
+        == "http://backend:8000/ask/invoke"
+    )
 
 
 def test_without_reference_numbers_removes_citations() -> None:
@@ -66,26 +70,5 @@ def test_request_answer_reports_unavailable_backend(monkeypatch) -> None:
 
     monkeypatch.setattr(serve.httpx, "post", fail)
 
-    with pytest.raises(serve.FrontendRequestError, match="Перезапустите"):
+    with pytest.raises(serve.FrontendRequestError, match="Проверьте backend"):
         serve.request_answer("Вопрос", "http://test/ask/invoke", 30)
-
-
-def test_ensure_backend_reuses_running_service(monkeypatch) -> None:
-    monkeypatch.setattr(serve, "backend_is_ready", lambda url: True)
-
-    def unexpected_start() -> FakeProcess:
-        raise AssertionError("a running backend must be reused")
-
-    monkeypatch.setattr(serve, "_start_backend", unexpected_start)
-
-    serve.ensure_backend("http://127.0.0.1:8000/ask/invoke", 1)
-
-
-def test_ensure_backend_starts_and_waits_for_service(monkeypatch) -> None:
-    readiness = iter([False, False, True])
-    process = FakeProcess()
-    monkeypatch.setattr(serve, "backend_is_ready", lambda url: next(readiness))
-    monkeypatch.setattr(serve, "_start_backend", lambda: process)
-    monkeypatch.setattr(serve.time, "sleep", lambda seconds: None)
-
-    serve.ensure_backend("http://127.0.0.1:8000/ask/invoke", 1)
