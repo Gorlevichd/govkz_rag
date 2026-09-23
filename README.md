@@ -90,9 +90,17 @@ Local QA is the default and requires no credentials. To use an external
 OpenAI-compatible service, change `agent.qa.provider` and `agent.qa.model` in
 `config.yaml`, then set `BASE_URL` and `API_KEY` in `.env` before rebuilding.
 
-The default Compose configuration is CPU-compatible. Local QA may be slow on weak
-machines; GPU-enabled Ollama can be configured with a Compose override appropriate
-for the host platform.
+The default Compose configuration is CPU-compatible. On a host with an NVIDIA GPU,
+working drivers, and the [NVIDIA Container Toolkit](https://docs.ollama.com/docker),
+enable GPU access for Ollama with:
+
+```bash
+docker compose -f compose.yaml -f docker/compose.gpu.yaml up -d
+```
+
+This reserves one GPU for Ollama; it does not publish Ollama's port. Use the same
+`-f` options for later Compose commands that manage the GPU deployment. Local QA
+may be slow on weak machines without GPU acceleration.
 
 ## Local setup
 

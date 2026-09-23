@@ -94,9 +94,10 @@ Example:
 # Deployment
 
 - App is deployed with docker compose
-- On build the app should:
+- Persist all the downloads in volumes
+- On first build the app should:
     - Pull ollama image
-    - Download the required ollama models
+    - Download the required ollama models.
     - Download the dataset from http://magda-minio-web.data.gov.kz/magda-datasets/egov_ru.xlsx
-    - Download the Chroma index from the Github Releases or rebuild it from data. The choice between using an existing index and rebuilding should be configurable in compose.yaml
+    - Rebuild Chroma index from the data
     - Start backend in a separate container before serving a web app
